@@ -60,6 +60,8 @@ public class VideoCreator {
         assetWriter.add(audioAssetWriterInput)
     }
     
+    public var startTime: CMTime? = nil
+    
     public func write(sample: CMSampleBuffer, isVideo: Bool) {
         guard CMSampleBufferDataIsReady(sample),
             assetWriter.status != .failed else {
@@ -71,6 +73,7 @@ public class VideoCreator {
             let startTime = CMSampleBufferGetPresentationTimeStamp(sample)
             assetWriter.startWriting()
             assetWriter.startSession(atSourceTime: startTime)
+            self.startTime = startTime
             print("assetWriter startWriting")
         }
 
