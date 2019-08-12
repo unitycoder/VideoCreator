@@ -89,6 +89,10 @@ class ViewController: UIViewController {
         }
         self.tmpFilePath = "\(dir)/tmpVideo.mov"
         
+        var textureCache: CVMetalTextureCache?
+        CVMetalTextureCacheCreate(nil, nil, ViewController.sharedMtlDevive, nil, &textureCache)
+        capturedImageTextureCache = textureCache
+        
         self.makeVideoCreator()
         self.captureSession.startRunning()
         print("start running")
@@ -126,6 +130,8 @@ class ViewController: UIViewController {
         self.isRecording = false
     }
     
+    var capturedImageTextureCache: CVMetalTextureCache!
+    
     func makeVideoCreator() {
         let fileManager = FileManager()
         if fileManager.fileExists(atPath: self.tmpFilePath) {
@@ -151,6 +157,21 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptur
                                      isVideo: false)
             return
         }
+        
+        let oriPixelBuffer: CVPixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)!
+        let capturedImageTextureY: CVMetalTexture? = createTexture(fromPixelBuffer: oriPixelBuffer, pixelFormat:.r8Unorm, planeIndex:0)
+        let capturedImageTextureCbCr: CVMetalTexture? = createTexture(fromPixelBuffer: oriPixelBuffer, pixelFormat:.rg8Unorm, planeIndex:1)
+        
+        guard let textureY = capturedImageTextureY, let textureCbCr = capturedImageTextureCbCr else {
+            return
+        }
+        
+        let texY = CVMetalTextureGetTexture(textureY)
+        let texC = CVMetalTextureGetTexture(textureCbCr)
+        
+        
+        
+        
         
         let time: CMTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         if let tex: MTLTexture = sampleBuffer.toMtlTexture,
@@ -233,6 +254,20 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptur
                                      isVideo: true)
             CVPixelBufferUnlockBaseAddress(recodePixelBuffer, CVPixelBufferLockFlags(rawValue: 0))
         }
+    }
+    
+    func createTexture(fromPixelBuffer pixelBuffer: CVPixelBuffer, pixelFormat: MTLPixelFormat, planeIndex: Int) -> CVMetalTexture? {
+        let width = CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex)
+        let height = CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex)
+        
+        var texture: CVMetalTexture? = nil
+        let status = CVMetalTextureCacheCreateTextureFromImage(nil, capturedImageTextureCache, pixelBuffer, nil, pixelFormat, width, height, planeIndex, &texture)
+        
+        if status != kCVReturnSuccess {
+            texture = nil
+        }
+        
+        return texture
     }
 
     func printCVPixelBuffer(buff imageBuffer: CVPixelBuffer) {
